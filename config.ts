@@ -1,8 +1,8 @@
 
-export const API_BASE_URL = "https://cloudburst-backend.onrender.com";
+export const API_BASE_URL: string = "https://cloudburst-backend.onrender.com";
 
-// TODO: Replace '#' with the actual direct download link for your extension zip/crx file
-export const EXTENSION_DOWNLOAD_LINK = "#"; 
+// Direct download link for the extension zip file
+export const EXTENSION_DOWNLOAD_LINK: string = "https://raw.githubusercontent.com/archit-awasthi/cloudburst-mainextension/main/cloudburst-mainextension.zip"; 
 
 export const API_ENDPOINTS = {
   REPORT: `${API_BASE_URL}/report`,

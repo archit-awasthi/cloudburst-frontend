@@ -18,7 +18,7 @@ export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
   };
 
   const handleDownload = () => {
-    if (EXTENSION_DOWNLOAD_LINK && EXTENSION_DOWNLOAD_LINK !== '#') {
+    if (EXTENSION_DOWNLOAD_LINK && (EXTENSION_DOWNLOAD_LINK as string) !== '#') {
       window.open(EXTENSION_DOWNLOAD_LINK, '_blank');
     } else {
       console.warn("Download link not set in config.ts");
