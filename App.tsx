@@ -10,29 +10,32 @@ export default function App() {
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
   const [reportId, setReportId] = useState<string | null>(null);
 
+  const updateStateFromUrl = () => {
+    const path = window.location.pathname;
+    // Regex to match /report/some-id-here
+    const reportMatch = path.match(/^\/report\/([^/]+)/);
+
+    if (reportMatch && reportMatch[1]) {
+      console.log("Route detected: Report ID", reportMatch[1]);
+      setReportId(reportMatch[1]);
+      setView('dashboard');
+    } else if (path === '/' || path === '') {
+      setReportId(null);
+      setView('landing');
+    } else {
+      // Handle unknown routes by defaulting to landing, or could be 404
+      setReportId(null);
+      setView('landing');
+    }
+  };
+
   useEffect(() => {
-    const handleUrlChange = () => {
-      const path = window.location.pathname;
-      const reportMatch = path.match(/^\/report\/([^/]+)/);
+    // Check initial load
+    updateStateFromUrl();
 
-      if (reportMatch && reportMatch[1]) {
-        setReportId(reportMatch[1]);
-        setView('dashboard');
-      } else {
-        setReportId(null);
-        setView('landing');
-      }
-    };
-
-    // Check on initial load
-    handleUrlChange();
-
-    // Listen for browser back/forward buttons
-    window.addEventListener('popstate', handleUrlChange);
-
-    return () => {
-      window.removeEventListener('popstate', handleUrlChange);
-    };
+    // Handle browser Back/Forward
+    window.addEventListener('popstate', updateStateFromUrl);
+    return () => window.removeEventListener('popstate', updateStateFromUrl);
   }, []);
 
   const handleShowReport = (id?: string) => {
@@ -41,18 +44,17 @@ export default function App() {
       setView('dashboard');
       window.history.pushState({}, '', `/report/${id}`);
     } else {
+      // Demo mode
       setReportId(null);
-      setView('dashboard'); // Demo mode
-      // Optional: change URL to /demo if you wanted, but keeping it at / or just rendering dashboard is fine
-      // For clarity, we'll keep URL as is or set to /demo
+      setView('dashboard'); 
+      window.history.pushState({}, '', '/demo');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBackToHome = () => {
     window.history.pushState({}, '', '/');
-    setView('landing');
-    setReportId(null);
+    updateStateFromUrl();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
