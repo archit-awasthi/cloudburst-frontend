@@ -1,15 +1,18 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { TypingText } from './TypingText';
 import { Button } from './Button';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ArrowRight, Search } from 'lucide-react';
 import { EXTENSION_DOWNLOAD_LINK } from '../config';
 
 interface HeroProps {
-  onShowReport: () => void;
+  onShowReport: (id?: string) => void;
 }
 
 export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
+  const [showInput, setShowInput] = useState(false);
+  const [manualId, setManualId] = useState('');
+
   const scrollToInstructions = () => {
     const instructionsElement = document.getElementById('instructions');
     if (instructionsElement) {
@@ -22,8 +25,14 @@ export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
       window.open(EXTENSION_DOWNLOAD_LINK, '_blank');
     } else {
       console.warn("Download link not set in config.ts");
-      // Fallback behavior or alert if needed
       alert("Download link coming soon.");
+    }
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (manualId.trim()) {
+      onShowReport(manualId.trim());
     }
   };
 
@@ -60,9 +69,43 @@ export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
           <Button variant="primary" icon="download" onClick={handleDownload}>
             Download Extension
           </Button>
-          <Button variant="secondary" icon="dashboard" onClick={onShowReport}>
-            Show My Report
+          <Button variant="secondary" icon="dashboard" onClick={() => onShowReport()}>
+            Show Demo Report
           </Button>
+        </div>
+
+        {/* Manual Report Entry */}
+        <div className="h-16 mt-4 flex flex-col items-center justify-start animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          {!showInput ? (
+            <button 
+              onClick={() => setShowInput(true)}
+              className="text-sm text-gray-500 hover:text-brand-orange transition-colors flex items-center gap-1 group"
+            >
+              Have a Report ID? 
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          ) : (
+            <form onSubmit={handleManualSubmit} className="flex items-center gap-2 bg-white/5 p-1 rounded-full border border-white/10 focus-within:border-brand-orange/50 transition-colors">
+              <div className="pl-3 text-gray-500">
+                <Search size={14} />
+              </div>
+              <input 
+                type="text" 
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value)}
+                placeholder="Enter Report ID..."
+                className="bg-transparent border-none outline-none text-sm text-brand-cream placeholder-gray-600 w-32 md:w-40"
+                autoFocus
+              />
+              <button 
+                type="submit"
+                className="bg-brand-orange text-white rounded-full p-1.5 hover:bg-orange-600 transition-colors"
+                disabled={!manualId.trim()}
+              >
+                <ArrowRight size={14} />
+              </button>
+            </form>
+          )}
         </div>
 
       </div>

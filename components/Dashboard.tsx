@@ -26,7 +26,8 @@ const MOCK_ACTIVITY_DATA = [
   { name: 'Sun', hours: 6.0 },
 ];
 
-const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload, label }) => {
+// Simplified tooltip definition to avoid complex generic type issues at runtime/build time
+const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-brand-gray border border-white/10 p-3 rounded-lg shadow-xl">
