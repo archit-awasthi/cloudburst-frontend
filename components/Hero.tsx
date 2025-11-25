@@ -112,7 +112,7 @@ export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
 
       {/* Scroll Indicator */}
       <div 
-        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce cursor-pointer text-white transition-opacity hover:opacity-100 opacity-90" 
+        className="absolute bottom-10 left-[48%] -translate-x-1/2 flex flex-col items-center animate-bounce cursor-pointer text-white transition-opacity hover:opacity-100 opacity-90" 
         onClick={scrollToInstructions}
       >
         <span className="text-xs mb-2 font-medium tracking-wide">How to use</span>
