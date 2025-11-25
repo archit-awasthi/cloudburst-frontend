@@ -1,8 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, TooltipProps } from 'recharts';
-import { Clock, MousePointerClick, TrendingUp, AlertCircle, RefreshCw, Server } from 'lucide-react';
+import { Clock, MousePointerClick, TrendingUp, AlertCircle, RefreshCw, Server, ShieldCheck } from 'lucide-react';
 import { API_ENDPOINTS } from '../config';
+
+interface DashboardProps {
+  reportId?: string | null;
+}
 
 // Fallback/Demo Data
 const MOCK_CATEGORY_DATA = [
@@ -36,9 +40,11 @@ const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload
     return null;
   };
 
-export const Dashboard: React.FC = () => {
+export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
   const [loading, setLoading] = useState(false);
   const [usingDemoData, setUsingDemoData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [categoryData, setCategoryData] = useState(MOCK_CATEGORY_DATA);
   const [activityData, setActivityData] = useState(MOCK_ACTIVITY_DATA);
   const [stats, setStats] = useState({
@@ -50,35 +56,44 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Basic check for query params if you implement user specific reports later (e.g. ?uid=123)
-      // const urlParams = new URLSearchParams(window.location.search);
-      // const uid = urlParams.get('uid'); 
+      if (!reportId) {
+        setUsingDemoData(true);
+        return;
+      }
       
       setLoading(true);
+      setError(null);
+      
       try {
-        console.log(`Connecting to ${API_ENDPOINTS.REPORT}...`);
-        const response = await fetch(API_ENDPOINTS.REPORT);
+        const url = API_ENDPOINTS.GET_REPORT(reportId);
+        console.log(`Fetching report from ${url}...`);
+        
+        const response = await fetch(url);
         
         if (response.ok) {
           const data = await response.json();
-          // Assuming the backend returns a structure similar to our state.
-          // You would map real data here.
+          
+          // Map backend response to frontend state
+          // We handle potential missing fields gracefully
           if (data.categoryData) setCategoryData(data.categoryData);
           if (data.activityData) setActivityData(data.activityData);
           if (data.stats) setStats(data.stats);
+          
           setUsingDemoData(false);
         } else {
-          console.warn("Backend reachable but returned error, using demo data.");
+          setError("Report not found or expired.");
+          // Keep demo data but show error state
         }
-      } catch (error) {
-        console.log("Could not fetch backend data (likely CORS or endpoint mismatch), using demo data.");
+      } catch (err) {
+        console.error("Error fetching report:", err);
+        setError("Could not connect to server.");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [reportId]);
 
   if (loading) {
     return (
@@ -86,9 +101,9 @@ export const Dashboard: React.FC = () => {
         <RefreshCw className="animate-spin" size={48} />
         <div className="flex items-center gap-2 text-brand-cream animate-pulse">
             <Server size={18} />
-            <span>Connecting to CloudBurst Secure Server...</span>
+            <span>Analyzing your secure data...</span>
         </div>
-        <p className="text-xs text-gray-500">This might take a moment if the server is waking up.</p>
+        <p className="text-xs text-gray-500">Decryption and analysis in progress</p>
       </div>
     );
   }
@@ -100,14 +115,28 @@ export const Dashboard: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-6">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">Your Digital Pulse</h2>
-            <p className="text-gray-400">Analysis based on last 7 days of activity</p>
+            <h2 className="text-3xl font-bold text-white mb-2">
+              {reportId ? "Your Personal Report" : "Your Digital Pulse"}
+            </h2>
+            <p className="text-gray-400">
+              {reportId ? "Analysis complete based on your recent history" : "Demo analysis based on sample data"}
+            </p>
           </div>
           <div className="flex items-center gap-4">
-             {usingDemoData && (
+             {usingDemoData && !error && (
                 <span className="text-xs text-gray-600 bg-white/5 px-2 py-1 rounded border border-white/5">
                   Demo Data
                 </span>
+             )}
+             {error && (
+               <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+                 {error} - Showing Demo
+               </span>
+             )}
+             {!usingDemoData && (
+               <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded border border-green-500/20 flex items-center gap-1">
+                 <ShieldCheck size={12} /> Live Report
+               </span>
              )}
             <div className="px-4 py-2 bg-brand-orange/10 border border-brand-orange/30 rounded-lg text-brand-orange flex items-center gap-2">
               <AlertCircle size={16} />
@@ -184,7 +213,7 @@ export const Dashboard: React.FC = () => {
                     stroke="none"
                   >
                     {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color || '#8884d8'} />
                     ))}
                   </Pie>
                   <Tooltip 
@@ -197,7 +226,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex flex-wrap justify-center gap-4 mt-4">
               {categoryData.map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || '#8884d8' }} />
                   <span className="text-sm text-gray-400">{item.name}</span>
                 </div>
               ))}
