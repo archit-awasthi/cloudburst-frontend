@@ -1,0 +1,5 @@
+{
+  "name": "CloudBurst",
+  "description": "A privacy-focused browser history analyzer helping you find your time leakage.",
+  "requestFramePermissions": []
+}
