@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { Clock, MousePointerClick, TrendingUp, AlertCircle, RefreshCw, Server, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { Clock, RefreshCw, Server, ShieldCheck, AlertTriangle, Globe, ArrowUpRight } from 'lucide-react';
 import { API_ENDPOINTS } from '../config';
 
 interface DashboardProps {
@@ -14,6 +14,12 @@ interface HistoryEntry {
   domain: string;
   visitCount: number;
   lastVisitTime: number;
+}
+
+interface DashboardStats {
+  totalScreenTime: string;
+  totalVisits: number;
+  topDomains: { domain: string; visits: number }[];
 }
 
 // --- Helper Functions for Data Processing ---
@@ -81,10 +87,15 @@ const DEMO_DATA = {
     { name: 'Sun', hours: 6.0 },
   ],
   stats: {
-    totalScreenTime: "42.3 hrs",
-    mostVisited: "youtube.com",
-    visits: "142",
-    leakage: "18.5 hrs"
+    totalScreenTime: "42.3",
+    totalVisits: 1240,
+    topDomains: [
+      { domain: 'youtube.com', visits: 142 },
+      { domain: 'github.com', visits: 89 },
+      { domain: 'google.com', visits: 65 },
+      { domain: 'twitter.com', visits: 45 },
+      { domain: 'reddit.com', visits: 32 }
+    ]
   }
 };
 
@@ -95,7 +106,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
   
   const [categoryData, setCategoryData] = useState(DEMO_DATA.categoryData);
   const [activityData, setActivityData] = useState(DEMO_DATA.activityData);
-  const [stats, setStats] = useState(DEMO_DATA.stats);
+  const [stats, setStats] = useState<DashboardStats>(DEMO_DATA.stats);
+
+  // Normalize data helper to handle potential snake_case from backend
+  const normalizeData = (data: any) => {
+    if (!data) return [];
+    // If it's already an array, return it
+    if (Array.isArray(data)) return data;
+    // Check for common wrapper keys
+    if (Array.isArray(data.entries)) return data.entries;
+    if (Array.isArray(data.history)) return data.history;
+    if (Array.isArray(data.data)) return data.data;
+    return [];
+  };
 
   useEffect(() => {
     if (!reportId) {
@@ -120,16 +143,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
           throw new Error(res.status === 404 ? 'Report not found' : 'Failed to load report');
         }
 
-        const data = await res.json();
+        const rawData = await res.json();
+        console.log("Raw backend response:", rawData);
+
+        const entries = normalizeData(rawData);
         
-        if (data.entries && Array.isArray(data.entries) && data.entries.length > 0) {
-          processHistoryData(data.entries);
+        if (entries.length > 0) {
+          processHistoryData(entries);
           setUsingDemoData(false);
-        } else if (data.entries && data.entries.length === 0) {
-           setError("Report found but contains no history data.");
         } else {
-           // If backend returns other format (unlikely based on prompt, but safety first)
-           setError("Invalid data format received.");
+           setError("Report found but contains no history data.");
         }
 
       } catch (err: any) {
@@ -143,39 +166,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
     fetchReport();
   }, [reportId]);
 
-  const processHistoryData = (entries: HistoryEntry[]) => {
+  const processHistoryData = (entries: any[]) => {
+    // Clean and normalize entries
+    const cleanEntries: HistoryEntry[] = entries.map(e => ({
+      url: e.url || '',
+      title: e.title || 'Unknown Page',
+      domain: e.domain || (e.url ? new URL(e.url).hostname : 'unknown'),
+      visitCount: parseInt(e.visitCount || e.visit_count || '1', 10),
+      lastVisitTime: parseFloat(e.lastVisitTime || e.last_visit_time || Date.now())
+    }));
+
     // 1. Calculate Totals
-    const totalVisits = entries.reduce((acc, item) => acc + (item.visitCount || 1), 0);
+    const totalVisits = cleanEntries.reduce((acc, item) => acc + item.visitCount, 0);
     const estimatedTotalMinutes = totalVisits * ESTIMATED_MINUTES_PER_VISIT;
     const totalHours = (estimatedTotalMinutes / 60).toFixed(1);
 
-    // 2. Find Most Visited Domain
+    // 2. Top 5 Domains
     const domainVisits: Record<string, number> = {};
-    entries.forEach(e => {
+    cleanEntries.forEach(e => {
       if (!e.domain) return;
-      domainVisits[e.domain] = (domainVisits[e.domain] || 0) + (e.visitCount || 1);
+      domainVisits[e.domain] = (domainVisits[e.domain] || 0) + e.visitCount;
     });
 
-    const sortedDomains = Object.entries(domainVisits).sort(([, a], [, b]) => b - a);
-    const topDomain = sortedDomains.length > 0 ? sortedDomains[0][0] : 'N/A';
+    const topDomains = Object.entries(domainVisits)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([domain, visits]) => ({ domain, visits }));
 
     // 3. Categorization (Pie Chart)
     const categoryCounts: Record<string, number> = {};
-    let leakageMinutes = 0;
 
-    entries.forEach(e => {
+    cleanEntries.forEach(e => {
       if (!e.domain) return;
       const cat = getCategory(e.domain);
-      const visits = e.visitCount || 1;
+      const visits = e.visitCount;
       categoryCounts[cat] = (categoryCounts[cat] || 0) + visits;
-
-      // Define "Leakage" as Social or Entertainment
-      if (cat === 'Social Media' || cat === 'Entertainment' || cat === 'Shopping') {
-        leakageMinutes += visits * ESTIMATED_MINUTES_PER_VISIT;
-      }
     });
-
-    const leakageHours = (leakageMinutes / 60).toFixed(1);
 
     const processedCategories = Object.entries(categoryCounts)
       .map(([name, value]) => ({
@@ -189,29 +215,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayCounts = new Array(7).fill(0);
 
-    entries.forEach(e => {
+    cleanEntries.forEach(e => {
       if (e.lastVisitTime) {
         const dayIndex = new Date(e.lastVisitTime).getDay(); // 0 = Sun
-        dayCounts[dayIndex] += ((e.visitCount || 1) * ESTIMATED_MINUTES_PER_VISIT) / 60; // Add hours
+        dayCounts[dayIndex] += (e.visitCount * ESTIMATED_MINUTES_PER_VISIT) / 60; // Add hours
       }
     });
 
-    // Reorder to start from Mon for the chart if desired, or keep Sun-Sat
-    // Let's do Mon-Sun for business week feel
+    // Reorder Mon(1) to Sat(6), then Sun(0) at end
     const orderedDays = [];
-    // Mon(1) to Sat(6)
     for (let i = 1; i <= 6; i++) {
       orderedDays.push({ name: days[i], hours: parseFloat(dayCounts[i].toFixed(1)) });
     }
-    // Add Sun(0) at end
     orderedDays.push({ name: days[0], hours: parseFloat(dayCounts[0].toFixed(1)) });
 
     // 5. Update State
     setStats({
-      totalScreenTime: `${totalHours} hrs`,
-      mostVisited: topDomain,
-      visits: totalVisits.toLocaleString(),
-      leakage: `${leakageHours} hrs`
+      totalScreenTime: totalHours,
+      totalVisits: totalVisits,
+      topDomains: topDomains
     });
 
     setCategoryData(processedCategories);
@@ -224,9 +246,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
         <RefreshCw className="animate-spin" size={48} />
         <div className="flex items-center gap-2 text-brand-cream animate-pulse">
             <Server size={18} />
-            <span>Decrypting & Analyzing Report...</span>
+            <span>Analyzing Report Data...</span>
         </div>
-        <p className="text-xs text-gray-500">Fetching report ID: {reportId}</p>
+        <p className="text-xs text-gray-500">ID: {reportId}</p>
       </div>
     );
   }
@@ -238,7 +260,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
             <AlertTriangle size={48} className="text-red-500 mb-4" />
             <h2 className="text-xl font-bold text-white mb-2">Unable to Load Report</h2>
             <p className="text-gray-400 mb-6">{error}</p>
-            <p className="text-sm text-gray-600">Check the ID and try again, or analyze your history again from the extension.</p>
             <div className="mt-6 pt-6 border-t border-white/10 w-full text-center">
                 <a href="/" className="text-brand-orange hover:underline text-sm">Return to Home</a>
             </div>
@@ -255,13 +276,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-6">
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">
-              {usingDemoData ? "Your Digital Pulse" : "Analysis Complete"}
+              {usingDemoData ? "Digital Pulse (Demo)" : "Your Analysis"}
             </h2>
             <div className="flex items-center gap-2 text-gray-400">
                 {usingDemoData ? (
-                    <span>Demo analysis based on sample data</span>
+                    <span>Based on sample data</span>
                 ) : (
-                    <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded">ID: {reportId}</span>
+                    <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded">Report ID: {reportId}</span>
                 )}
             </div>
           </div>
@@ -279,65 +300,108 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-brand-gray/30 p-6 rounded-2xl border border-white/5 backdrop-blur-sm hover:border-brand-orange/30 transition-colors group">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-blue-500/20 rounded-lg text-blue-400 group-hover:text-blue-300 transition-colors">
-                <Clock size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Est. Screen Time</p>
-                <h3 className="text-2xl font-bold text-white">{stats.totalScreenTime}</h3>
-              </div>
+        {/* Top Section: Screen Time & Top Sites */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Main Stat: Total Screen Time */}
+          <div className="lg:col-span-1 bg-brand-gray/30 p-8 rounded-2xl border border-white/5 backdrop-blur-sm flex flex-col justify-center relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Clock size={100} className="text-brand-orange" />
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              Based on {stats.visits} history entries
+            <div className="relative z-10">
+              <p className="text-gray-400 font-medium mb-2">Total Screen Time</p>
+              <h3 className="text-5xl md:text-6xl font-bold text-white tracking-tight">
+                {stats.totalScreenTime}<span className="text-2xl text-gray-500 ml-2">hrs</span>
+              </h3>
+              <div className="mt-6 flex items-center gap-2 text-sm text-gray-500 bg-black/20 w-fit px-3 py-1.5 rounded-full">
+                <RefreshCw size={12} />
+                <span>Last 7 Days</span>
+              </div>
             </div>
           </div>
 
-          <div className="bg-brand-gray/30 p-6 rounded-2xl border border-white/5 backdrop-blur-sm hover:border-brand-orange/30 transition-colors group">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-green-500/20 rounded-lg text-green-400 group-hover:text-green-300 transition-colors">
-                <MousePointerClick size={24} />
+          {/* Top 5 Visited Sites */}
+          <div className="lg:col-span-2 bg-brand-gray/20 p-6 rounded-2xl border border-white/5">
+            <h3 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+              <Globe size={18} className="text-brand-orange" />
+              Top 5 Visited Websites
+            </h3>
+            <div className="overflow-hidden">
+              <div className="grid grid-cols-12 text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">
+                <div className="col-span-1">#</div>
+                <div className="col-span-8">Domain</div>
+                <div className="col-span-3 text-right">Visits</div>
               </div>
-              <div>
-                <p className="text-gray-400 text-sm">Most Visited</p>
-                <h3 className="text-xl font-bold text-white truncate max-w-[180px]" title={stats.mostVisited}>
-                    {stats.mostVisited}
-                </h3>
+              <div className="space-y-2">
+                {stats.topDomains.map((item, index) => (
+                  <div key={index} className="grid grid-cols-12 items-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                    <div className="col-span-1 font-mono text-brand-orange/70">0{index + 1}</div>
+                    <div className="col-span-8 font-medium text-white truncate flex items-center gap-2">
+                      <img 
+                        src={`https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`} 
+                        alt="" 
+                        className="w-4 h-4 rounded-sm opacity-70"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                      {item.domain}
+                    </div>
+                    <div className="col-span-3 text-right text-gray-300 font-mono">{item.visits}</div>
+                  </div>
+                ))}
               </div>
-            </div>
-             <div className="text-xs text-gray-500 mt-2">
-              Top distraction source
             </div>
           </div>
 
-          <div className="bg-brand-gray/30 p-6 rounded-2xl border border-white/5 backdrop-blur-sm hover:border-brand-orange/30 transition-colors group">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-brand-orange/20 rounded-lg text-brand-orange group-hover:text-orange-400 transition-colors">
-                <TrendingUp size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Time Leakage</p>
-                <h3 className="text-2xl font-bold text-white">{stats.leakage}</h3>
-              </div>
-            </div>
-             <div className="text-xs text-gray-500 mt-2">
-              Spent on Social & Entertainment
-            </div>
-          </div>
         </div>
 
-        {/* Charts */}
+        {/* Bottom Section: Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
+          {/* Weekly Activity */}
+          <div className="bg-brand-gray/20 p-6 rounded-2xl border border-white/5">
+            <h3 className="text-xl font-semibold mb-6 text-white flex items-center gap-2">
+               Weekly Activity <span className="text-sm font-normal text-gray-500 ml-2">(Hours)</span>
+            </h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#555" 
+                    tick={{fill: '#888', fontSize: 12}} 
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis 
+                    stroke="#555" 
+                    tick={{fill: '#888', fontSize: 12}} 
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    content={<CustomTooltip />} 
+                    cursor={{fill: 'rgba(255,140,66,0.1)', radius: 4}} 
+                  />
+                  <Bar 
+                    dataKey="hours" 
+                    fill="#FF8C42" 
+                    radius={[4, 4, 0, 0]} 
+                    barSize={40} 
+                    activeBar={{ fill: '#FF6B00' }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           {/* Category Distribution */}
           <div className="bg-brand-gray/20 p-6 rounded-2xl border border-white/5">
             <h3 className="text-xl font-semibold mb-6 text-white">Category Distribution</h3>
             {categoryData.length > 0 ? (
-              <>
-                <div className="h-[300px] w-full">
+              <div className="flex flex-col md:flex-row items-center gap-8">
+                <div className="h-[250px] w-[250px] relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -360,47 +424,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
                       />
                     </PieChart>
                   </ResponsiveContainer>
+                  {/* Center Text */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                     <span className="text-2xl font-bold text-white">{stats.totalVisits}</span>
+                     <p className="text-[10px] text-gray-500 uppercase tracking-wide">Visits</p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap justify-center gap-4 mt-4 max-h-24 overflow-y-auto pr-2">
-                  {categoryData.slice(0, 8).map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || '#8884d8' }} />
-                      <span className="text-sm text-gray-400">{item.name}</span>
+                
+                {/* Legend */}
+                <div className="flex-1 w-full grid grid-cols-2 gap-3">
+                  {categoryData.slice(0, 6).map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-gray-300 truncate">{item.name}</span>
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-gray-500">
-                Not enough data for categories
+              <div className="h-[300px] flex items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-lg">
+                Not enough data to categorize
               </div>
             )}
-          </div>
-
-          {/* Daily Activity */}
-          <div className="bg-brand-gray/20 p-6 rounded-2xl border border-white/5">
-            <h3 className="text-xl font-semibold mb-6 text-white">Weekly Activity (Est. Hours)</h3>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={activityData}>
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="#555" 
-                    tick={{fill: '#888', fontSize: 12}} 
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    stroke="#555" 
-                    tick={{fill: '#888', fontSize: 12}} 
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                  <Bar dataKey="hours" fill="#FF8C42" radius={[4, 4, 0, 0]} barSize={30} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </div>
         </div>
       </div>
