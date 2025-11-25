@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Logo } from './Logo';
 
 interface NavbarProps {
   onViewChange: () => void;
@@ -14,10 +15,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onViewChange, currentView }) => 
         <div className="pointer-events-auto">
           <button 
             onClick={onViewChange} 
-            className="text-2xl font-bold tracking-tighter text-brand-cream hover:opacity-80 transition-opacity focus:outline-none"
+            className="flex items-center gap-2 group focus:outline-none"
             aria-label="Go to home"
           >
-            CloudBurst
+            <Logo className="w-8 h-8 text-brand-orange drop-shadow-[0_0_8px_rgba(255,140,66,0.5)] transition-transform group-hover:scale-110" />
+            <span className="text-2xl font-bold tracking-tighter text-brand-cream group-hover:opacity-80 transition-opacity">
+              CloudBurst
+            </span>
           </button>
         </div>
         

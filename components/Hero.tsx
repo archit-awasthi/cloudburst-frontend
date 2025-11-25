@@ -111,8 +111,11 @@ export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
       </div>
 
       {/* Scroll Indicator */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce cursor-pointer text-gray-500 hover:text-white transition-colors" onClick={scrollToInstructions}>
-        <span className="text-xs mb-2 block text-center opacity-50">How to use</span>
+      <div 
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce cursor-pointer text-white transition-opacity hover:opacity-100 opacity-90" 
+        onClick={scrollToInstructions}
+      >
+        <span className="text-xs mb-2 font-medium tracking-wide">How to use</span>
         <ChevronDown size={24} />
       </div>
     </section>
