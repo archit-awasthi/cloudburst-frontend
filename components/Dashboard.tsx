@@ -315,7 +315,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
               </h3>
               <div className="mt-6 flex items-center gap-2 text-sm text-gray-500 bg-black/20 w-fit px-3 py-1.5 rounded-full">
                 <RefreshCw size={12} />
-                <span>Last 7 Days</span>
+                <span>Last 30 Days</span>
               </div>
             </div>
           </div>
