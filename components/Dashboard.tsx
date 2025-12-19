@@ -360,7 +360,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ reportId }) => {
           {/* Weekly Activity */}
           <div className="bg-brand-gray/20 p-6 rounded-2xl border border-white/5">
             <h3 className="text-xl font-semibold mb-6 text-white flex items-center gap-2">
-               Weekly Activity <span className="text-sm font-normal text-gray-500 ml-2">(Hours)</span>
+               Daily Activity <span className="text-sm font-normal text-gray-500 ml-2">(Minutes)</span>
             </h3>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
