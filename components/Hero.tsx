@@ -89,7 +89,7 @@ export const Hero: React.FC<HeroProps> = ({ onShowReport }) => {
         {/* Title */}
         <div className="flex flex-col items-center">
           <h1 className="text-6xl md:text-8xl font-bold tracking-tight text-brand-cream drop-shadow-2xl">
-            VishnuBurst
+            Devops Burst
           </h1>
         </div>
 
